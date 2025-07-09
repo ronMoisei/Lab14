@@ -1,7 +1,4 @@
 import copy
-
-import networkx as nx
-
 from database.DAO import DAO
 import networkx as nx
 class Model:

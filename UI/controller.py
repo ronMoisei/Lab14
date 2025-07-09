@@ -10,7 +10,8 @@ class Controller:
             stores = self._model.getStores()
             self._view._ddStore.options.clear()
             for store in stores:
-                self._view._ddStore.options.append(ft.dropdown.Option(store))
+                print(store)
+                self._view._ddStore.options.append(ft.dropdown.Option(f"{store[0]}-{store[1]}"))
             self._view.update_page()
         except Exception as ex:
             self._show_error(f"Errore caricamento store: {ex}")

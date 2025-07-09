@@ -13,12 +13,13 @@ class DAO():
         results = []
 
         cursor = conn.cursor(dictionary=True)
-        query = "SELECT distinct o.store_id as store from orders o"
+        query = "SELECT distinct s.store_id as store, s.store_name as name from stores s"
 
         cursor.execute(query)
 
         for row in cursor:
-            results.append(row["store"])
+            print(row)
+            results.append((row["store"], row["name"]))
 
         cursor.close()
         conn.close()
@@ -64,6 +65,12 @@ class DAO():
         for row in cursor:
             results.append((idMap[row["id1"]],idMap[row["id2"]], row["cnt"]))
 
+
         cursor.close()
         conn.close()
+
         return results
+
+if __name__ == '__main__':
+    DAO = DAO()
+    stores = DAO.getAllStores()

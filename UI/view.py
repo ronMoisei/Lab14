@@ -59,18 +59,24 @@ class View(ft.UserControl):
         self._btnRicorsione = ft.ElevatedButton(text="Ricorsione",
                                            on_click=self._controller.handleRicorsione)
 
+        row1 = ft.Row([cont,
+                       self._txtIntK,
+                       self._btnCreaGrafo,
+                       ],
+                      alignment=ft.MainAxisAlignment.CENTER,
+                      vertical_alignment=ft.CrossAxisAlignment.END)
+        row2 = ft.Row([cont2,
+                       ft.Container(self._btnCerca, width=250)
+                       ], alignment=ft.MainAxisAlignment.CENTER)
 
-        row_cercaGrafoStore = ft.Row([cont,
-                                      self._txtIntK,
-                                      self._btnCreaGrafo,
-                                      cont2,
-                                      ft.Container(self._btnCerca, width=250),
-                                      ft.Container(self._btnRicorsione, width=250),],
-                                     alignment=ft.MainAxisAlignment.CENTER,
-                                     vertical_alignment=ft.CrossAxisAlignment.END)
+        row3 = ft.Row([ft.Container(self._btnRicorsione, width=250)
+                       ],
+                      alignment=ft.MainAxisAlignment.CENTER)
         self._page.add(header,
-                      row_cercaGrafoStore,
-                      )
+                       row1,
+                       row2,
+                       row3,
+                       )
 
         self.txt_result = ft.ListView(expand=1, spacing=10, padding=20, auto_scroll=True)
         self._page.controls.append(self.txt_result)
