@@ -16,31 +16,30 @@ def main(page: ft.Page):
 ft.app(target=main)
 
 """
-SIMULATION 2 — Stores 'customer-flow' Transition Graph + Best Decreasing-Weights Path
-Branch: sim-02_stores-transition_digraph_decreasing-weights-path
+SIMULATION 3 — Orders–Products Bipartite MultiGraph + Alternating Best Path
+Branch: sim-03_orders-products_bipartite_multigraph_altpath_decqty
 
 TYPE:
-    Directed weighted graph.
+    Undirected bipartite MultiGraph with weights.
 
 GRAPH:
-    - Nodes: stores.
-    - Edge u -> v: exists if, for the same customer, an order at store u is followed by the next
-      chronological order at store v (with u != v).
-    - Weight: number of such u->v transitions across all customers.
+    - Partitions: U=orders, V=products.
+    - Edge (o, p): exists for each order_items row; weight = SUM(quantity) for that (order, product).
 
 GRAPH EXERCISES:
-    1) Out-volume: sum of outgoing edge weights for a selected store.
-    2) Reachable set (BFS): nodes reachable from the selected store following edge direction.
+    1) Incident volume for a product (sum of incident edge weights).
+    2) Largest connected component size.
+    3) Shortest alternating path between two products (via orders).
 
 RECURSION (didactic pattern):
-    getOttimo(start, L) → initializes best solution and explores first hop.
-    _ricorsione(parziale, L) → expands only with strictly decreasing edge weights,
-                               avoids repeated nodes.
-    getScore(path) → sum of weights along the directed path.
+    getOttimo(p_start, L) → initializes best and seeds first hop to an Order.
+    _ricorsione(parziale, L, last_w) → expands alternating Product/Order with strictly decreasing weights.
+    getScore(path) → sum of edge weights along the path (summing parallel edges in MultiGraph).
 
 FILES:
-    - DAO: database/dao_stores_sim2.py
-    - Model: model/model_stores_sim2.py
-    - Controller: controller/controller_stores_sim2.py
-    - View: view/view_stores_sim2.py
+    - DAO: database/dao_orders_products_sim3.py
+    - Model: model/model_orders_products_sim3.py
+    - Controller: controller/controller_orders_products_sim3.py
+    - View: view/view_orders_products_sim3.py
 """
+
