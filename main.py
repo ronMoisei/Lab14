@@ -16,32 +16,36 @@ def main(page: ft.Page):
 ft.app(target=main)
 
 """
-SIMULATION 4 — Customers Similarity Graph + Diversified Team (min internal overlap)
-Branch: sim-04_customers-similarity_simple-graph_diversified-team
+SIMULATION 5 — Product Co-Purchase Weighted Graph + Max-Affinity Bundle (category-diverse)
+Branch: sim-05_products-copurchase_weighted-graph_max-bundle_diverse-category
 
 TYPE:
-    Simple undirected graph with an 'overlap' edge attribute.
+    Simple undirected weighted graph.
 
 GRAPH:
-    - Nodes: customers.
-    - Edge {u,v}: exists if u and v share at least T distinct products.
-    - Edge attribute 'overlap' = number of shared distinct products.
+    - Nodes: products.
+    - Edge {p1, p2}: weight = number of distinct orders where p1 and p2 appear together.
+    - Threshold parameter filters edges by minimum weight.
 
 GRAPH EXERCISES:
-    1) Neighborhood details for a customer (degree and neighbors sorted by overlap).
-    2) Connected component size for a customer.
-    3) Unweighted shortest path between two customers.
+    1) Incident volume for a product (sum of incident edge weights).
+    2) Connected component size.
+    3) Unweighted shortest path between two products.
+    4) Neighborhood sorted by edge weight.
 
 RECURSION (didactic pattern):
-    getOttimo(seed, K) → selects a team of K customers from the component of seed.
-    _ricorsione(parziale, K, candidates) → explores subsets including 'seed'.
-    getScore(team) → sum of 'overlap' on internal edges (to minimize for diversification).
+    getOttimo(seed, K) → maximize total internal co-purchase weight of a K-product bundle
+                         within the seed’s connected component, enforcing category diversity
+                         (at most one product per category).
+    _ricorsione(parziale, K, candidates, used_cat) → explores subsets honoring the constraint.
+    getScore(bundle) → sum of 'weight' over internal edges of the bundle.
 
 FILES:
-    - DAO: database/dao_customers_sim4.py
-    - Model: model/model_customers_sim4.py
-    - Controller: controller/controller_customers_sim4.py
-    - View: view/view_customers_sim4.py
+    - DAO: database/dao_products_sim5.py
+    - Model: model/model_products_sim5.py
+    - Controller: controller/controller_products_sim5.py
+    - View: view/view_products_sim5.py
 """
+
 
 

@@ -1,45 +1,45 @@
-# database/dao_customers_sim4.py
+# database/dao_products_sim5.py
 from database.DB_connect import DBConnect
-from model.customer import Customer
+from model.product import Product  # dataclass con product_id, product_name, brand_id, category_id, list_price
 
-class DAO_CustomersSim4:
+class DAO_ProductsSim5:
 
     @staticmethod
-    def get_all_customers():
+    def get_all_products():
         conn = DBConnect.get_connection()
         cur = conn.cursor(dictionary=True)
-        q = "SELECT * FROM customers"
+        # Portiamo anche brand_id e category_id per il vincolo di diversità
+        q = """
+        SELECT p.product_id, p.product_name, p.brand_id, p.category_id, p.list_price
+        FROM products p
+        """
         cur.execute(q)
-        res = [Customer(**row) for row in cur]
+        res = [Product(**row) for row in cur]
         cur.close(); conn.close()
         return res
 
     @staticmethod
-    def get_edges_with_overlap(idmap, threshold):
+    def get_copurchase_edges(idmap, min_weight: int):
         """
-        Coppie di clienti con numero di prodotti distinti comprati in comune >= threshold.
-        overlap = COUNT(DISTINCT product_id in comune).
+        Archi {p1,p2} con weight = #ordini in cui p1 e p2 sono co-presenti.
+        min_weight: soglia minima sul peso.
         """
         conn = DBConnect.get_connection()
         cur = conn.cursor(dictionary=True)
         q = """
-        SELECT c1.customer_id AS u, c2.customer_id AS v, COUNT(DISTINCT oi1.product_id) AS overlap_cnt
-        FROM orders o1, orders o2, order_items oi1, order_items oi2,
-             customers c1, customers c2
-        WHERE c1.customer_id = o1.customer_id
-          AND c2.customer_id = o2.customer_id
-          AND oi1.order_id = o1.order_id
-          AND oi2.order_id = o2.order_id
-          AND c1.customer_id < c2.customer_id
-          AND oi1.product_id = oi2.product_id
-        GROUP BY c1.customer_id, c2.customer_id
-        HAVING overlap_cnt >= %s
+        SELECT oi1.product_id AS p1, oi2.product_id AS p2, COUNT(DISTINCT oi1.order_id) AS w
+        FROM order_items oi1
+        JOIN order_items oi2
+          ON oi1.order_id = oi2.order_id
+         AND oi1.product_id < oi2.product_id
+        GROUP BY oi1.product_id, oi2.product_id
+        HAVING w >= %s
         """
-        cur.execute(q, (threshold,))
+        cur.execute(q, (min_weight,))
         edges = []
         for row in cur:
-            u, v, w = row["u"], row["v"], row["overlap_cnt"]
-            if u in idmap and v in idmap:
-                edges.append((idmap[u], idmap[v], w))
+            p1, p2, w = row["p1"], row["p2"], row["w"]
+            if p1 in idmap and p2 in idmap:
+                edges.append((idmap[p1], idmap[p2], w))
         cur.close(); conn.close()
         return edges
