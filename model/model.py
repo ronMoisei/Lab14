@@ -1,92 +1,95 @@
-# model/model_brands_sim7.py
+# model/model_categories_sim8.py
 import copy
 import networkx as nx
-from database.dao_brands_sim7 import DAO_BrandsSim7
+from database.dao_categories_sim8 import DAO_CategoriesSim8
 
-class ModelBrandsSim7:
+class ModelCategoriesSim8:
     def __init__(self):
-        self._G = nx.DiGraph()
-        self._brands = []
-        self._products = []
-        self._idBrands = {}
-        self._idProducts = {}
+        self._G = nx.Graph()
+        self._categories = []
+        self._idCat = {}
+        self._cat_customers = {}  # Category -> set(customer_id)
 
         # ricorsione
-        self._bestPath = []
-        self._bestScore = float('inf')
+        self._bestSet = []
+        self._bestScore = 0
 
-    # ---------- grafo ----------
-    def buildGraph(self):
+    # ------- grafo -------
+    def buildGraph(self, min_shared_orders: int):
         self._G.clear()
-        self._brands = DAO_BrandsSim7.get_all_brands()
-        self._idBrands = {b.brand_id: b for b in self._brands}
+        self._categories = DAO_CategoriesSim8.get_all_categories()
+        self._idCat = {c.category_id: c for c in self._categories}
+        self._G.add_nodes_from(self._categories)
 
-        self._products = DAO_BrandsSim7.get_all_products(self._idBrands)
-        self._idProducts = {p.product_id: p for p in self._products}
+        for u, v, w in DAO_CategoriesSim8.get_edges_cocart(self._idCat, min_shared_orders):
+            self._G.add_edge(u, v, weight=w)
 
-        # aggiungi archi brand→product
-        for p in self._products:
-            b = self._idBrands[p.brand_id]
-            self._G.add_edge(b, p, weight=p.list_price)
-
-        # aggiungi archi product→brand2 (collaborazioni)
-        for p1, b2id, cost in DAO_BrandsSim7.get_collab_edges(self._idProducts):
-            if b2id in self._idBrands:
-                self._G.add_edge(p1, self._idBrands[b2id], weight=cost)
+        self._cat_customers = DAO_CategoriesSim8.get_customers_by_category(self._idCat)
 
     def getGraphDetails(self):
         return self._G.number_of_nodes(), self._G.number_of_edges()
 
-    # ---------- esercizi ----------
-    def isReachable(self, b1, b2):
-        return nx.has_path(self._G, b1, b2)
+    def hasCategory(self, cid: int):
+        return cid in self._idCat
 
-    def shortest_path_min_cost(self, b1, b2):
+    def getCategory(self, cid: int):
+        return self._idCat[cid]
+
+    # ------- esercizi -------
+    def longest_component_size_from(self, category):
+        cc = nx.node_connected_component(self._G, category)
+        return len(cc)
+
+    def neighbors_sorted(self, category):
+        res = []
+        for v in self._G.neighbors(category):
+            res.append((v, self._G[category][v]["weight"]))
+        res.sort(key=lambda x: x[1], reverse=True)
+        return res
+
+    def shortest_path_unweighted(self, src, dst):
         try:
-            return nx.shortest_path(self._G, b1, b2, weight="weight"), nx.shortest_path_length(self._G, b1, b2, weight="weight")
+            return nx.shortest_path(self._G, src, dst)
         except nx.NetworkXNoPath:
-            return [], None
+            return []
 
-    def neighbors_sorted(self, node):
-        succ = []
-        for v in self._G.successors(node):
-            succ.append((v, self._G[node][v]["weight"]))
-        succ.sort(key=lambda x: x[1])
-        return succ
-
-    # ---------- ricorsione ----------
-    def getOttimo(self, seed, K):
+    # ------- ricorsione -------
+    def getOttimo(self, seed_category, K: int):
         """
-        Minimizza il costo medio tra brand raggiungibili.
+        Seleziona K categorie nella componente del seed massimizzando
+        il numero di clienti distinti coperti.
         """
-        self._bestPath = []
-        self._bestScore = float('inf')
+        self._bestSet = []
+        self._bestScore = 0
 
-        reachables = [n for n in self._G.nodes if nx.has_path(self._G, seed, n)]
-        parziale = [seed]
-        current_cost = 0
-        self._ricorsione(parziale, K, reachables, current_cost)
-        return self._bestPath, self._bestScore
+        comp = list(nx.node_connected_component(self._G, seed_category))
+        parziale = [seed_category]
+        current_customers = set(self._cat_customers.get(seed_category, set()))
 
-    def _ricorsione(self, parziale, K, candidates, current_cost):
+        self._ricorsione(parziale, K, comp, current_customers)
+        return self._bestSet, self._bestScore
+
+    def _ricorsione(self, parziale, K, candidates, current_customers: set):
         if len(parziale) == K:
-            score = self.getScore(current_cost, K)
-            if score < self._bestScore:
+            score = self.getScore(current_customers)
+            if score > self._bestScore:
                 self._bestScore = score
-                self._bestPath = copy.deepcopy(parziale)
+                self._bestSet = copy.deepcopy(parziale)
             return
 
-        last = parziale[-1]
-        for succ in self._G.successors(last):
-            if succ in parziale:
+        for cat in candidates:
+            if cat in parziale:
                 continue
-            cost = self._G[last][succ]["weight"]
-            parziale.append(succ)
-            self._ricorsione(parziale, K, candidates, current_cost + cost)
+            parziale.append(cat)
+            add = self._cat_customers.get(cat, set())
+            if add:
+                snap = current_customers.copy()
+                current_customers |= add
+                self._ricorsione(parziale, K, candidates, current_customers)
+                current_customers.clear(); current_customers |= snap
+            else:
+                self._ricorsione(parziale, K, candidates, current_customers)
             parziale.pop()
 
-    def getScore(self, total_cost, k):
-        """
-        Minimizza il costo medio.
-        """
-        return total_cost / k if k > 0 else float('inf')
+    def getScore(self, customers_union: set):
+        return len(customers_union)

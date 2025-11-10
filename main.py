@@ -15,36 +15,32 @@ def main(page: ft.Page):
 
 ft.app(target=main)
 
-
 """
-SIMULATION 7 — Brand → Product Supply Graph + Min-Cost Path of Brands
-Branch: sim-07_brands-products_directed-weighted-graph_min-cost_supply_path
+SIMULATION 8 — Category Co-Purchase Weighted Graph + Max Customer-Coverage K-Set
+Branch: sim-08_categories-copurchase_weighted-graph_max-customer-coverage_k-set
 
 TYPE
-  Directed weighted graph.
+  Simple undirected weighted graph.
 
 GRAPH
-  Nodes:
-      brands + products.
-  Edges:
-      brand → product  (peso = list_price)
-      product → brand₂  (peso = media list_price dei prodotti venduti nello stesso store)
-  Represents supply and cross-brand relations.
+  Nodes: categories.
+  Edge {c1,c2}: weight = #ordini distinti che contengono prodotti di entrambe le categorie,
+                 filtrato con min_shared_orders.
 
 EXERCISES
-  1) Verifica raggiungibilità tra due brand.
-  2) Shortest path min cost tra due brand.
-  3) Successori ordinati per costo crescente.
+  1) Longest component size dalla categoria A.
+  2) Shortest path non pesato tra due categorie A→B.
+  3) Vicini di A ordinati per peso decrescente.
 
 RECURSION
-  getOttimo(seed, K): trova un cammino di K nodi minimizzando il costo medio dei passaggi.
-  _ricorsione(): esplora i successori diretti, mantiene il costo totale corrente.
-  getScore(): ritorna il costo medio.
+  getOttimo(seed, K): seleziona K categorie nella componente di seed massimizzando
+                      la copertura di clienti distinti.
+  _ricorsione(parziale, K, candidates, current_customers): unione insiemi clienti con snapshot/rollback.
+  getScore(customers_union): cardinalità dell’unione.
 
 FILES
-  - database/dao_brands_sim7.py  
-  - model/model_brands_sim7.py  
-  - controller/controller_brands_sim7.py  
-  - view/view_brands_sim7.py
+  - database/dao_categories_sim8.py
+  - model/model_categories_sim8.py
+  - controller/controller_categories_sim8.py
+  - view/view_categories_sim8.py
 """
-
