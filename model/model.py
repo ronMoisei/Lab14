@@ -1,128 +1,109 @@
+# model/model_customers_sim6.py
 import copy
-from database.DAO import DAO
 import networkx as nx
-class Model:
-    def __init__(self):
-        self._graph = nx.DiGraph()
-        self._idMap = {}
+from database.dao_customers_sim6 import DAO_CustomersSim6
 
-    def getBestPath(self, startStr):
-        # Inizializza il percorso migliore e il punteggio massimo trovati
+class ModelCustomersSim6:
+    def __init__(self):
+        self._G = nx.Graph()
+        self._customers = []
+        self._idmap = {}
+        # supporto ricorsione
+        self._cust_brands = {}  # customer -> set(brand_id)
         self._bestPath = []
         self._bestScore = 0
 
-        # Converte l'identificatore di partenza da stringa a intero
-        # e lo mappa all'oggetto nodo corrispondente
-        start = self._idMap[int(startStr)]
+    # ---------- grafo ----------
+    def buildGraph(self, min_orders: int, min_shared: int):
+        self._G.clear()
+        self._customers = DAO_CustomersSim6.get_customers_min_orders(min_orders)
+        self._idmap = {c.customer_id: c for c in self._customers}
+        self._G.add_nodes_from(self._customers)
 
-        # Lista temporanea che terrà il percorso corrente, parte da 'start'
-        parziale = [start]
+        edges = DAO_CustomersSim6.get_edges_shared_brands(self._idmap, min_shared)
+        for u, v, w in edges:
+            self._G.add_edge(u, v, weight=w)
 
-        # Prende tutti i vicini diretti del nodo di partenza
-        vicini = self._graph.neighbors(start)
-        for v in vicini:
-            # Aggiunge ciascun vicino al percorso parziale
-            parziale.append(v)
-            # Avvia la ricorsione per esplorare i cammini che partono da questa estensione
-            self._ricorsione(parziale)
-            # Togli il nodo aggiunto, per provare il prossimo vicino
-            parziale.pop()
-
-        # Alla fine restituisce il miglior percorso e il relativo punteggio
-        return self._bestPath, self._bestScore
-
-    def _ricorsione(self, parziale):
-        # Calcola il punteggio del percorso corrente
-        current_score = self.getScore(parziale)
-        # Se è migliore di quello registrato, aggiorna bestScore e bestPath
-        if current_score > self._bestScore:
-            self._bestScore = current_score
-            # deepcopy per non avere riferimenti condivisi con 'parziale'
-            self._bestPath = copy.deepcopy(parziale)
-
-        # Esplora ulteriori estensioni del percorso
-        # Prende i vicini dell’ultimo nodo del percorso
-        ultimo = parziale[-1]
-        precedente = parziale[-2]  # nodo prima dell'ultimo
-
-        for v in self._graph.neighbors(ultimo):
-            # 1) Evita di tornare su nodi già visitati (nessuna ripetizione)
-            # 2) Controlla che il peso del nuovo arco (ultimo→v) sia minore
-            #    di quello dell’arco precedente (precedente→ultimo)
-            peso_precedente = self._graph[precedente][ultimo]["weight"]
-            peso_nuovo = self._graph[ultimo][v]["weight"]
-            if v not in parziale and peso_nuovo < peso_precedente:
-                # Aggiunge il nuovo nodo e continua la ricorsione
-                parziale.append(v)
-                self._ricorsione(parziale)
-                # Rimuove il nodo per backtracking
-                parziale.pop()
-
-    def getScore(self, listOfNodes):
-        """
-        Calcola il “punteggio” di un percorso sommando i pesi
-        di tutti gli archi che collegano i nodi consecutivi.
-        """
-        tot = 0
-        # Scorri ogni coppia di nodi adiacenti e somma il peso dell’arco
-        for i in range(len(listOfNodes) - 1):
-            src = listOfNodes[i]
-            dst = listOfNodes[i + 1]
-            tot += self._graph[src][dst]["weight"]
-        return tot
-
-
-
-    def getStores(self):
-        return DAO.getAllStores()
-
-
-    def buildGraph(self, store, k):
-        self._graph.clear()
-        self._orders = DAO.getAllOrdersbyStore(store)
-        for o in self._orders:
-            self._idMap[o.order_id] = o
-
-        self._graph.add_nodes_from(self._orders)
-
-        allEdges = DAO.getEdges(store, k, self._idMap)
-        for e in allEdges:
-                self._graph.add_edge(e[0], e[1], weight=e[2])
+        # precompute brand coverage
+        self._cust_brands = DAO_CustomersSim6.get_customer_brands(self._idmap)
 
     def getGraphDetails(self):
-        return self._graph.number_of_nodes(), self._graph.number_of_edges()
+        return self._G.number_of_nodes(), self._G.number_of_edges()
 
-    def getAllNodes(self):
-        nodes = list(self._graph.nodes)
-        return nodes
+    def hasCustomer(self, cid: int):
+        return cid in self._idmap
 
-    def getBFSNodesFromTree(self, source):
-        tree = nx.bfs_tree(self._graph, self._idMap[int(source)])
-        archi = list(tree.edges())
-        nodi = list(tree.nodes())
-        return nodi[1:]
+    def getCustomer(self, cid: int):
+        return self._idmap[cid]
 
-    def getDFSNodesFromTree(self, source):
-        tree = nx.dfs_tree(self._graph, source)
-        nodi = list(tree.nodes())
-        return nodi[1:]
+    # ---------- esercizi ----------
+    def component_size(self, cnode):
+        cc = nx.node_connected_component(self._G, cnode)
+        return len(cc)
 
-    def getCammino(self, sourceStr):
-        source = self._idMap[int(sourceStr)]
-        lp = []
+    def neighbors_sorted(self, cnode):
+        vic = []
+        for v in self._G.neighbors(cnode):
+            vic.append((v, self._G[cnode][v]["weight"]))
+        vic.sort(key=lambda x: x[1], reverse=True)
+        return vic
 
-        #for source in self._graph.nodes:
-        tree = nx.dfs_tree(self._graph, source)
-        nodi = list(tree.nodes())
+    def shortest_path_unweighted(self, src, dst):
+        try:
+            return nx.shortest_path(self._G, src, dst)
+        except nx.NetworkXNoPath:
+            return []
 
-        for node in nodi:
-            tmp = [node]
+    # ---------- ricorsione ----------
+    def getOttimo(self, seed, K: int):
+        """
+        Seleziona K clienti nella componente connessa di seed massimizzando
+        la copertura di brand unici acquistati dal team.
+        Score = | ∪_c brands(c) |.
+        """
+        self._bestPath = []
+        self._bestScore = 0
 
-            while tmp[0] != source:
-                pred = nx.predecessor(tree, source, tmp[0])
-                tmp.insert(0, pred[0])
+        comp = list(nx.node_connected_component(self._G, seed))
+        # seed incluso
+        parziale = [seed]
+        # unione brand corrente
+        current_brands = set(self._cust_brands.get(seed, set()))
 
-            if len(tmp) > len(lp):
-                lp = copy.deepcopy(tmp)
+        self._ricorsione(parziale, K, comp, current_brands)
+        return self._bestPath, self._bestScore
 
-        return lp
+    def _ricorsione(self, parziale, K, candidates, current_brands: set):
+        if len(parziale) == K:
+            score = self.getScore(current_brands)
+            if score > self._bestScore:
+                self._bestScore = score
+                self._bestPath = copy.deepcopy(parziale)
+            return
+
+        for cust in candidates:
+            if cust in parziale:
+                continue
+            # aggiungo
+            parziale.append(cust)
+            prev_size = len(current_brands)
+            # aggiorno insieme brand (in place + rollback)
+            add_brands = self._cust_brands.get(cust, set())
+            # efficienza: union in place
+            old_snapshot = None
+            # salvo snapshot SOLO se necessario per rollback veloce
+            if add_brands:
+                old_snapshot = current_brands.copy()
+                current_brands |= add_brands
+
+            self._ricorsione(parziale, K, candidates, current_brands)
+
+            # rollback
+            parziale.pop()
+            if add_brands:
+                current_brands.clear()
+                current_brands |= old_snapshot
+            # se nessun brand aggiunto, nessuna azione
+
+    def getScore(self, brands_union: set):
+        return len(brands_union)

@@ -1,111 +1,67 @@
+# view/view_customers_sim6.py
 import flet as ft
-
 
 class View(ft.UserControl):
     def __init__(self, page: ft.Page):
         super().__init__()
-        # page stuff
         self._page = page
-        self._page.title = "TdP Lab 14 - simulazione esame"
+        self._page.title = "Sim-06 Customer Similarity Weighted Graph"
         self._page.horizontal_alignment = 'CENTER'
         self._page.theme_mode = ft.ThemeMode.LIGHT
-        self._page.window_height = 800
-        page.window_center()
-        # controller (it is not initialized. Must be initialized in the main, after the controller is created)
         self._controller = None
-        # graphical elements
-        self._title = None
-        self._txt_name = None
-        self._txt_result = None
+
+        # UI refs
+        self._txtMinOrders = None
+        self._txtMinShared = None
+        self._btnCrea = None
+
+        self._txtCust = None
+        self._btnComp = None
+        self._btnVicini = None
+
+        self._txtCust2 = None
+        self._btnShortest = None
+
+        self._txtSeed = None
+        self._txtK = None
+        self._btnOttimo = None
+
+        self.txt_result = None
 
     def load_interface(self):
-        # 1) Switch tema
-        self.__theme_switch = ft.Switch(
-            label="Light theme",
-            value=False,  # False = light, True = dark
-            on_change=self.theme_changed
-        )
+        # riga 1: creazione grafo
+        self._txtMinOrders = ft.TextField(label="min_orders", width=140)
+        self._txtMinShared = ft.TextField(label="min_shared_brands", width=180)
+        self._btnCrea = ft.ElevatedButton(text="Crea Grafo", on_click=self._controller.handleCreaGrafo)
+        self._page.add(ft.Row([self._txtMinOrders, self._txtMinShared, self._btnCrea],
+                              alignment=ft.MainAxisAlignment.CENTER))
 
-        # Titolo in pagina (Text)
-        self._title = ft.Text("TdP Lab 14 – simulazione esame", color="blue", size=24)
+        # riga 2: cliente singolo
+        self._txtCust = ft.TextField(label="customer_id A", width=160, disabled=True)
+        self._btnComp = ft.ElevatedButton(text="Componente(A)", on_click=self._controller.handleComp, disabled=True)
+        self._btnVicini = ft.ElevatedButton(text="Vicini(A) peso↓", on_click=self._controller.handleVicini, disabled=True)
+        self._page.add(ft.Row([self._txtCust, self._btnComp, self._btnVicini],
+                              alignment=ft.MainAxisAlignment.CENTER))
 
-        # Header con switch e titolo
-        header = ft.Row(
-            controls=[
-                ft.Container(self.__theme_switch, padding=10),
-                ft.Container(self._title, expand=True,
-                             alignment= ft.alignment.top_center),
-            ],
-            alignment=ft.MainAxisAlignment.CENTER
-        )
+        # riga 3: shortest path
+        self._txtCust2 = ft.TextField(label="customer_id B", width=160, disabled=True)
+        self._btnShortest = ft.ElevatedButton(text="Shortest path A→B", on_click=self._controller.handleShortest, disabled=True)
+        self._page.add(ft.Row([self._txtCust2, self._btnShortest], alignment=ft.MainAxisAlignment.CENTER))
 
+        # riga 4: ricorsione
+        self._txtSeed = ft.TextField(label="seed customer_id", width=160, disabled=True)
+        self._txtK = ft.TextField(label="K", width=100, disabled=True)
+        self._btnOttimo = ft.ElevatedButton(text="Team ottimo (max brand coverage)", on_click=self._controller.handleOttimo, disabled=True)
+        self._page.add(ft.Row([self._txtSeed, self._txtK, self._btnOttimo], alignment=ft.MainAxisAlignment.CENTER))
 
-        self._ddStore = ft.Dropdown(label="Store")
-        self._txtIntK = ft.TextField(label="Numero giorni massimo K")
-        self._btnCreaGrafo = ft.ElevatedButton(text="Crea Grafo", on_click=self._controller.handleCreaGrafo)
-        cont = ft.Container(self._ddStore, width=250, alignment=ft.alignment.top_left)
-        row1 = ft.Row([cont, self._txtIntK, self._btnCreaGrafo], alignment=ft.MainAxisAlignment.CENTER,
-                      vertical_alignment=ft.CrossAxisAlignment.END)
-
-        self._controller.fillDDStore()
-
-        self._btnCerca = ft.ElevatedButton(text="Cerca Percorso Massimo",
-                                           on_click=self._controller.handleCerca)
-
-        self._ddNode = ft.Dropdown(label="Node")
-        cont2 = ft.Container(self._ddNode, width=250, alignment=ft.alignment.top_left)
-
-
-        self._btnRicorsione = ft.ElevatedButton(text="Ricorsione",
-                                           on_click=self._controller.handleRicorsione)
-
-        row1 = ft.Row([cont,
-                       self._txtIntK,
-                       self._btnCreaGrafo,
-                       ],
-                      alignment=ft.MainAxisAlignment.CENTER,
-                      vertical_alignment=ft.CrossAxisAlignment.END)
-        row2 = ft.Row([cont2,
-                       ft.Container(self._btnCerca, width=250)
-                       ], alignment=ft.MainAxisAlignment.CENTER)
-
-        row3 = ft.Row([ft.Container(self._btnRicorsione, width=250)
-                       ],
-                      alignment=ft.MainAxisAlignment.CENTER)
-        self._page.add(header,
-                       row1,
-                       row2,
-                       row3,
-                       )
-
-        self.txt_result = ft.ListView(expand=1, spacing=10, padding=20, auto_scroll=True)
-        self._page.controls.append(self.txt_result)
+        # output
+        self.txt_result = ft.ListView(expand=1, spacing=10, padding=14, auto_scroll=False)
+        self._page.add(self.txt_result)
         self._page.update()
 
-    def theme_changed(self, e: ft.ControlEvent):
-        # inverte tema
-        self._page.theme_mode = (
-            ft.ThemeMode.DARK
-            if self._page.theme_mode == ft.ThemeMode.LIGHT
-            else ft.ThemeMode.LIGHT
-        )
-        # aggiorna label
-        self.__theme_switch.label = (
-            "Light theme"
-            if self._page.theme_mode == ft.ThemeMode.LIGHT
-            else "Dark theme"
-        )
-        self._page.update()
     @property
-    def controller(self):
-        return self._controller
-
+    def controller(self): return self._controller
     @controller.setter
-    def controller(self, controller):
-        self._controller = controller
-
-    def set_controller(self, controller):
-        self._controller = controller
-
-    def update_page(self):
-        self._page.update()
+    def controller(self, c): self._controller = c
+    def set_controller(self, c): self._controller = c
+    def update_page(self): self._page.update()
