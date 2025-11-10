@@ -17,32 +17,34 @@ ft.app(target=main)
 
 
 """
-SIMULATION 6 — Customer Similarity Weighted Graph + Max Brand-Coverage K-Team
-Branch: sim-06_customers-similarity_weighted-graph_max-brand-coverage_k-team
+SIMULATION 7 — Brand → Product Supply Graph + Min-Cost Path of Brands
+Branch: sim-07_brands-products_directed-weighted-graph_min-cost_supply_path
 
-TYPE:
-    Simple undirected weighted graph.
+TYPE
+  Directed weighted graph.
 
-GRAPH:
-    - Nodes: customers with at least 'min_orders' orders.
-    - Edge {c1,c2}: weight = number of distinct brands both have purchased.
-    - Edges filtered by 'min_shared' (minimum shared brands).
+GRAPH
+  Nodes:
+      brands + products.
+  Edges:
+      brand → product  (peso = list_price)
+      product → brand₂  (peso = media list_price dei prodotti venduti nello stesso store)
+  Represents supply and cross-brand relations.
 
-GRAPH EXERCISES:
-    1) Connected component size of a customer.
-    2) Unweighted shortest path between two customers.
-    3) Neighbors of a customer sorted by edge weight (shared brands).
+EXERCISES
+  1) Verifica raggiungibilità tra due brand.
+  2) Shortest path min cost tra due brand.
+  3) Successori ordinati per costo crescente.
 
-RECURSION (didactic pattern):
-    getOttimo(seed, K) → select K customers from seed’s connected component
-                         maximizing brand coverage: |⋃ brands(customer)|.
-    _ricorsione(parziale, K, candidates, current_brands) → explores team subsets,
-                                                           updating union of brands and rolling back.
-    getScore(current_brands) → cardinality of union set.
+RECURSION
+  getOttimo(seed, K): trova un cammino di K nodi minimizzando il costo medio dei passaggi.
+  _ricorsione(): esplora i successori diretti, mantiene il costo totale corrente.
+  getScore(): ritorna il costo medio.
 
-FILES:
-    - DAO: database/dao_customers_sim6.py
-    - Model: model/model_customers_sim6.py
-    - Controller: controller/controller_customers_sim6.py
-    - View: view/view_customers_sim6.py
+FILES
+  - database/dao_brands_sim7.py  
+  - model/model_brands_sim7.py  
+  - controller/controller_brands_sim7.py  
+  - view/view_brands_sim7.py
 """
+

@@ -1,109 +1,92 @@
-# model/model_customers_sim6.py
+# model/model_brands_sim7.py
 import copy
 import networkx as nx
-from database.dao_customers_sim6 import DAO_CustomersSim6
+from database.dao_brands_sim7 import DAO_BrandsSim7
 
-class ModelCustomersSim6:
+class ModelBrandsSim7:
     def __init__(self):
-        self._G = nx.Graph()
-        self._customers = []
-        self._idmap = {}
-        # supporto ricorsione
-        self._cust_brands = {}  # customer -> set(brand_id)
+        self._G = nx.DiGraph()
+        self._brands = []
+        self._products = []
+        self._idBrands = {}
+        self._idProducts = {}
+
+        # ricorsione
         self._bestPath = []
-        self._bestScore = 0
+        self._bestScore = float('inf')
 
     # ---------- grafo ----------
-    def buildGraph(self, min_orders: int, min_shared: int):
+    def buildGraph(self):
         self._G.clear()
-        self._customers = DAO_CustomersSim6.get_customers_min_orders(min_orders)
-        self._idmap = {c.customer_id: c for c in self._customers}
-        self._G.add_nodes_from(self._customers)
+        self._brands = DAO_BrandsSim7.get_all_brands()
+        self._idBrands = {b.brand_id: b for b in self._brands}
 
-        edges = DAO_CustomersSim6.get_edges_shared_brands(self._idmap, min_shared)
-        for u, v, w in edges:
-            self._G.add_edge(u, v, weight=w)
+        self._products = DAO_BrandsSim7.get_all_products(self._idBrands)
+        self._idProducts = {p.product_id: p for p in self._products}
 
-        # precompute brand coverage
-        self._cust_brands = DAO_CustomersSim6.get_customer_brands(self._idmap)
+        # aggiungi archi brand→product
+        for p in self._products:
+            b = self._idBrands[p.brand_id]
+            self._G.add_edge(b, p, weight=p.list_price)
+
+        # aggiungi archi product→brand2 (collaborazioni)
+        for p1, b2id, cost in DAO_BrandsSim7.get_collab_edges(self._idProducts):
+            if b2id in self._idBrands:
+                self._G.add_edge(p1, self._idBrands[b2id], weight=cost)
 
     def getGraphDetails(self):
         return self._G.number_of_nodes(), self._G.number_of_edges()
 
-    def hasCustomer(self, cid: int):
-        return cid in self._idmap
-
-    def getCustomer(self, cid: int):
-        return self._idmap[cid]
-
     # ---------- esercizi ----------
-    def component_size(self, cnode):
-        cc = nx.node_connected_component(self._G, cnode)
-        return len(cc)
+    def isReachable(self, b1, b2):
+        return nx.has_path(self._G, b1, b2)
 
-    def neighbors_sorted(self, cnode):
-        vic = []
-        for v in self._G.neighbors(cnode):
-            vic.append((v, self._G[cnode][v]["weight"]))
-        vic.sort(key=lambda x: x[1], reverse=True)
-        return vic
-
-    def shortest_path_unweighted(self, src, dst):
+    def shortest_path_min_cost(self, b1, b2):
         try:
-            return nx.shortest_path(self._G, src, dst)
+            return nx.shortest_path(self._G, b1, b2, weight="weight"), nx.shortest_path_length(self._G, b1, b2, weight="weight")
         except nx.NetworkXNoPath:
-            return []
+            return [], None
+
+    def neighbors_sorted(self, node):
+        succ = []
+        for v in self._G.successors(node):
+            succ.append((v, self._G[node][v]["weight"]))
+        succ.sort(key=lambda x: x[1])
+        return succ
 
     # ---------- ricorsione ----------
-    def getOttimo(self, seed, K: int):
+    def getOttimo(self, seed, K):
         """
-        Seleziona K clienti nella componente connessa di seed massimizzando
-        la copertura di brand unici acquistati dal team.
-        Score = | ∪_c brands(c) |.
+        Minimizza il costo medio tra brand raggiungibili.
         """
         self._bestPath = []
-        self._bestScore = 0
+        self._bestScore = float('inf')
 
-        comp = list(nx.node_connected_component(self._G, seed))
-        # seed incluso
+        reachables = [n for n in self._G.nodes if nx.has_path(self._G, seed, n)]
         parziale = [seed]
-        # unione brand corrente
-        current_brands = set(self._cust_brands.get(seed, set()))
-
-        self._ricorsione(parziale, K, comp, current_brands)
+        current_cost = 0
+        self._ricorsione(parziale, K, reachables, current_cost)
         return self._bestPath, self._bestScore
 
-    def _ricorsione(self, parziale, K, candidates, current_brands: set):
+    def _ricorsione(self, parziale, K, candidates, current_cost):
         if len(parziale) == K:
-            score = self.getScore(current_brands)
-            if score > self._bestScore:
+            score = self.getScore(current_cost, K)
+            if score < self._bestScore:
                 self._bestScore = score
                 self._bestPath = copy.deepcopy(parziale)
             return
 
-        for cust in candidates:
-            if cust in parziale:
+        last = parziale[-1]
+        for succ in self._G.successors(last):
+            if succ in parziale:
                 continue
-            # aggiungo
-            parziale.append(cust)
-            prev_size = len(current_brands)
-            # aggiorno insieme brand (in place + rollback)
-            add_brands = self._cust_brands.get(cust, set())
-            # efficienza: union in place
-            old_snapshot = None
-            # salvo snapshot SOLO se necessario per rollback veloce
-            if add_brands:
-                old_snapshot = current_brands.copy()
-                current_brands |= add_brands
-
-            self._ricorsione(parziale, K, candidates, current_brands)
-
-            # rollback
+            cost = self._G[last][succ]["weight"]
+            parziale.append(succ)
+            self._ricorsione(parziale, K, candidates, current_cost + cost)
             parziale.pop()
-            if add_brands:
-                current_brands.clear()
-                current_brands |= old_snapshot
-            # se nessun brand aggiunto, nessuna azione
 
-    def getScore(self, brands_union: set):
-        return len(brands_union)
+    def getScore(self, total_cost, k):
+        """
+        Minimizza il costo medio.
+        """
+        return total_cost / k if k > 0 else float('inf')

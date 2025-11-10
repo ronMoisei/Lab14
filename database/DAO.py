@@ -1,86 +1,57 @@
-# database/dao_customers_sim6.py
+# database/dao_brands_sim7.py
 from database.DB_connect import DBConnect
-from model.customer import Customer  # dataclass: customer_id, first_name, last_name, email, __hash__/__str__
+from model.brand import Brand
+from model.product import Product
 
-class DAO_CustomersSim6:
+class DAO_BrandsSim7:
 
     @staticmethod
-    def get_customers_min_orders(min_orders: int):
-        """
-        Prende i clienti con almeno min_orders ordini.
-        """
+    def get_all_brands():
         conn = DBConnect.get_connection()
         cur = conn.cursor(dictionary=True)
-        q = """
-        SELECT c.customer_id, c.first_name, c.last_name, c.email
-        FROM customers c
-        JOIN orders o ON o.customer_id = c.customer_id
-        GROUP BY c.customer_id, c.first_name, c.last_name, c.email
-        HAVING COUNT(DISTINCT o.order_id) >= %s
-        """
-        cur.execute(q, (min_orders,))
-        res = [Customer(**row) for row in cur]
+        q = "SELECT brand_id, brand_name FROM brands"
+        cur.execute(q)
+        res = [Brand(**row) for row in cur]
         cur.close(); conn.close()
         return res
 
     @staticmethod
-    def get_edges_shared_brands(idmap: dict, min_shared: int):
-        """
-        Crea archi tra clienti con #brand condivisi >= min_shared.
-        weight = #brand condivisi.
-        """
+    def get_all_products(idmap_brands: dict):
         conn = DBConnect.get_connection()
         cur = conn.cursor(dictionary=True)
         q = """
-        SELECT t1.customer_id AS c1, t2.customer_id AS c2, COUNT(DISTINCT t1.brand_id) AS w
-        FROM (
-            SELECT o.customer_id, p.brand_id
-            FROM orders o
-            JOIN order_items oi ON oi.order_id = o.order_id
-            JOIN products p ON p.product_id = oi.product_id
-            GROUP BY o.customer_id, p.brand_id
-        ) t1
-        JOIN (
-            SELECT o.customer_id, p.brand_id
-            FROM orders o
-            JOIN order_items oi ON oi.order_id = o.order_id
-            JOIN products p ON p.product_id = oi.product_id
-            GROUP BY o.customer_id, p.brand_id
-        ) t2
-              ON t1.brand_id = t2.brand_id
-             AND t1.customer_id < t2.customer_id
-        GROUP BY t1.customer_id, t2.customer_id
-        HAVING w >= %s
-        """
-        cur.execute(q, (min_shared,))
-        edges = []
-        for row in cur:
-            c1, c2, w = row["c1"], row["c2"], row["w"]
-            if c1 in idmap and c2 in idmap:
-                edges.append((idmap[c1], idmap[c2], w))
-        cur.close(); conn.close()
-        return edges
-
-    @staticmethod
-    def get_customer_brands(idmap: dict):
-        """
-        Mappa: customer -> set(brand_id) acquistati.
-        Serve per lo score della ricorsione (copertura brand).
-        """
-        conn = DBConnect.get_connection()
-        cur = conn.cursor(dictionary=True)
-        q = """
-        SELECT o.customer_id, p.brand_id
-        FROM orders o
-        JOIN order_items oi ON oi.order_id = o.order_id
-        JOIN products p ON p.product_id = oi.product_id
-        GROUP BY o.customer_id, p.brand_id
+        SELECT product_id, product_name, brand_id, list_price
+        FROM products
         """
         cur.execute(q)
-        brandmap = {c: set() for c in idmap.values()}
+        products = []
         for row in cur:
-            cid = row["customer_id"]
-            if cid in idmap:
-                brandmap[idmap[cid]].add(row["brand_id"])
+            if row["brand_id"] in idmap_brands:
+                products.append(Product(**row))
         cur.close(); conn.close()
-        return brandmap
+        return products
+
+    @staticmethod
+    def get_collab_edges(idmap_products: dict):
+        """
+        Crea archi product→brand2 se due brand hanno prodotti venduti nello stesso store.
+        """
+        conn = DBConnect.get_connection()
+        cur = conn.cursor(dictionary=True)
+        q = """
+        SELECT p1.product_id AS p1, p2.brand_id AS b2, AVG(p2.list_price) AS cost
+        FROM order_items oi1
+        JOIN orders o1 ON oi1.order_id = o1.order_id
+        JOIN products p1 ON p1.product_id = oi1.product_id
+        JOIN order_items oi2 ON oi2.order_id = o1.order_id
+        JOIN products p2 ON p2.product_id = oi2.product_id
+        WHERE p1.brand_id <> p2.brand_id
+        GROUP BY p1.product_id, p2.brand_id
+        """
+        cur.execute(q)
+        edges = []
+        for row in cur:
+            if row["p1"] in idmap_products:
+                edges.append((idmap_products[row["p1"]], row["b2"], row["cost"]))
+        cur.close(); conn.close()
+        return edges
