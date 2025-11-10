@@ -16,30 +16,32 @@ def main(page: ft.Page):
 ft.app(target=main)
 
 """
-SIMULATION 3 — Orders–Products Bipartite MultiGraph + Alternating Best Path
-Branch: sim-03_orders-products_bipartite_multigraph_altpath_decqty
+SIMULATION 4 — Customers Similarity Graph + Diversified Team (min internal overlap)
+Branch: sim-04_customers-similarity_simple-graph_diversified-team
 
 TYPE:
-    Undirected bipartite MultiGraph with weights.
+    Simple undirected graph with an 'overlap' edge attribute.
 
 GRAPH:
-    - Partitions: U=orders, V=products.
-    - Edge (o, p): exists for each order_items row; weight = SUM(quantity) for that (order, product).
+    - Nodes: customers.
+    - Edge {u,v}: exists if u and v share at least T distinct products.
+    - Edge attribute 'overlap' = number of shared distinct products.
 
 GRAPH EXERCISES:
-    1) Incident volume for a product (sum of incident edge weights).
-    2) Largest connected component size.
-    3) Shortest alternating path between two products (via orders).
+    1) Neighborhood details for a customer (degree and neighbors sorted by overlap).
+    2) Connected component size for a customer.
+    3) Unweighted shortest path between two customers.
 
 RECURSION (didactic pattern):
-    getOttimo(p_start, L) → initializes best and seeds first hop to an Order.
-    _ricorsione(parziale, L, last_w) → expands alternating Product/Order with strictly decreasing weights.
-    getScore(path) → sum of edge weights along the path (summing parallel edges in MultiGraph).
+    getOttimo(seed, K) → selects a team of K customers from the component of seed.
+    _ricorsione(parziale, K, candidates) → explores subsets including 'seed'.
+    getScore(team) → sum of 'overlap' on internal edges (to minimize for diversification).
 
 FILES:
-    - DAO: database/dao_orders_products_sim3.py
-    - Model: model/model_orders_products_sim3.py
-    - Controller: controller/controller_orders_products_sim3.py
-    - View: view/view_orders_products_sim3.py
+    - DAO: database/dao_customers_sim4.py
+    - Model: model/model_customers_sim4.py
+    - Controller: controller/controller_customers_sim4.py
+    - View: view/view_customers_sim4.py
 """
+
 
