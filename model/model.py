@@ -1,13 +1,13 @@
-# model/model_products_sim1.py
+# model/model_stores_sim2.py
 import copy
 import networkx as nx
-from database.DAO import DAO_ProdSim1
+from database.dao_stores_sim2 import DAO_StoresSim2
 
-class ModelProdSim1:
+class ModelStoresSim2:
     def __init__(self):
-        self._G = nx.Graph()
-        self._products = DAO_ProdSim1.get_all_products()
-        self._idmap = {p.product_id: p for p in self._products}
+        self._G = nx.DiGraph()
+        self._stores = DAO_StoresSim2.get_all_stores()
+        self._idmap = {s.store_id: s for s in self._stores}
 
         # campi per la ricorsione
         self._bestPath = []
@@ -15,9 +15,13 @@ class ModelProdSim1:
 
     # ---------- GRAFO ----------
     def buildGraph(self):
+        """
+        Crea il grafo diretto pesato delle transizioni tra store.
+        """
         self._G.clear()
-        self._G.add_nodes_from(self._products)
-        for e in DAO_ProdSim1.get_edges_copurchase(self._idmap):
+        self._G.add_nodes_from(self._stores)
+        for e in DAO_StoresSim2.get_transition_edges(self._idmap):
+            # e.o1 -> e.o2 con peso e.peso
             self._G.add_edge(e.o1, e.o2, weight=e.peso)
 
     def getGraphDetails(self):
@@ -26,33 +30,39 @@ class ModelProdSim1:
     def getAllNodes(self):
         return list(self._G.nodes())
 
-    def getNeighborsSorted(self, p):
-        vic = []
-        for v in self._G.neighbors(p):
-            vic.append((v, self._G[p][v]["weight"]))
-        vic.sort(key=lambda x: x[1], reverse=True)
-        return vic
-
-    def edgeVolume(self, p):
+    def outVolume(self, s):
         """
-        Somma dei pesi degli archi incidenti a p.
+        Somma dei pesi degli archi uscenti dallo store s.
         """
         vol = 0
-        for v in self._G.neighbors(p):
-            vol += self._G[p][v]["weight"]
+        for _, v, data in self._G.out_edges(s, data=True):
+            vol += data["weight"]
         return vol
 
-    def maxComponentSize(self):
-        if self._G.number_of_nodes() == 0:
-            return 0
-        comps = nx.connected_components(self._G)
-        return max(len(cc) for cc in comps)
+    def getReachableBFS(self, s):
+        """
+        Nodi raggiungibili da s via BFS sui soli archi diretti.
+        Restituisce i nodi escluso s.
+        """
+        tree = nx.bfs_tree(self._G, s)  # su DiGraph: segue la direzione
+        nodes = list(tree.nodes())
+        return nodes[1:]  # escluso s
+
+    def getIdMap(self):
+        return self._idmap
+
+    def hasNode(self, store_id: int):
+        return store_id in self._idmap
+
+    def getObjectFromId(self, store_id: int):
+        return self._idmap[store_id]
 
     # ---------- RICORSIONE ----------
-    def getOttimo(self, source, L):
+    def getOttimo(self, start, L):
         """
-        Path semplice di lunghezza esatta L, tutto nella stessa categoria del source.
-        Massimizza la somma dei pesi degli archi.
+        Cammino semplice diretto di lunghezza esatta L a pesi strettamente decrescenti.
+        Massimizza la somma dei pesi.
+        L >= 2: numero di nodi nel path.
         """
         self._bestPath = []
         self._bestScore = 0
@@ -60,20 +70,17 @@ class ModelProdSim1:
         if L < 2:
             return [], 0
 
-        cat = source.category_id
-        parziale = [source]
-
-        # primo passo: solo vicini della stessa categoria
-        for v in self._G.neighbors(source):
-            if v.category_id == cat:
-                parziale.append(v)
-                self._ricorsione(parziale, L, cat)
-                parziale.pop()
+        parziale = [start]
+        # primo passo: proviamo ogni vicino uscente
+        for v in self._G.successors(start):
+            parziale.append(v)
+            self._ricorsione(parziale, L)
+            parziale.pop()
 
         return self._bestPath, self._bestScore
 
-    def _ricorsione(self, parziale, L, cat):
-        # soluzione completa
+    def _ricorsione(self, parziale, L):
+        # Se ho raggiunto L nodi, valuto la soluzione e termino
         if len(parziale) == L:
             sc = self.getScore(parziale)
             if sc > self._bestScore:
@@ -81,20 +88,23 @@ class ModelProdSim1:
                 self._bestPath = copy.deepcopy(parziale)
             return
 
-        # altrimenti espando con nodi non ancora presenti e stessa categoria
-        last = parziale[-1]
-        for v in self._G.neighbors(last):
+        # Espansione: rispetto il vincolo "peso nuovo < peso precedente"
+        u_prev = parziale[-2]
+        u = parziale[-1]
+        w_prev = self._G[u_prev][u]["weight"]
+
+        for v in self._G.successors(u):
             if v in parziale:
                 continue
-            if v.category_id != cat:
-                continue
-            parziale.append(v)
-            self._ricorsione(parziale, L, cat)
-            parziale.pop()
+            w_new = self._G[u][v]["weight"]
+            if w_new < w_prev:
+                parziale.append(v)
+                self._ricorsione(parziale, L)
+                parziale.pop()
 
     def getScore(self, path):
         """
-        Somma pesi archi consecutivi del path.
+        Somma dei pesi sugli archi consecutivi del path diretto.
         """
         if len(path) < 2:
             return 0

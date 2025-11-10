@@ -1,35 +1,64 @@
-# view/view_products_sim1.py
+# view/view_stores_sim2.py
 import flet as ft
 
-class ViewProdSim1(ft.UserControl):
+class View(ft.UserControl):
     def __init__(self, page: ft.Page):
         super().__init__()
+        # page stuff
         self._page = page
-        self._page.title = "Sim-01 Products Co-purchase – Weighted Graph"
-        self._ctl = None
+        self._page.title = "Sim-02 Stores Transition – Directed Weighted Graph"
+        self._page.horizontal_alignment = 'CENTER'
+        self._page.theme_mode = ft.ThemeMode.LIGHT
 
-        self.dd_products = None
-        self.txt_L = None
-        self.lst = None
+        # controller (inizializzato nel main)
+        self._controller = None
+
+        # UI elements
+        self._title = None
+        self._btnCreaGrafo = None
+        self._txtIdStore = None
+        self._btnRaggiungibili = None
+        self._btnOutVolume = None
+        self._ddLun = None
+        self._btnCerca = None
+        self.txt_result = None
 
     def load_interface(self):
-        self.dd_products = ft.Dropdown(label="Prodotto")
-        self.txt_L = ft.TextField(label="L (lunghezza esatta)", width=180)
+        self._title = ft.Text("Sim-02 — Stores Transition Graph", color="blue", size=22)
+        self._btnCreaGrafo = ft.ElevatedButton(text="Crea Grafo", on_click=self._controller.handleCreaGrafo)
 
-        btnBuild = ft.ElevatedButton("Crea grafo", on_click=self._ctl.handleBuild)
-        btnVic   = ft.ElevatedButton("Vicini ordinati", on_click=self._ctl.handleNeighbors)
-        btnVol   = ft.ElevatedButton("Edge volume", on_click=self._ctl.handleVolume)
-        btnCC    = ft.ElevatedButton("Max componente", on_click=self._ctl.handleMaxCC)
-        btnBest  = ft.ElevatedButton("Cammino ottimo (L)", on_click=self._ctl.handleBestPath)
+        row1 = ft.Row([self._title, self._btnCreaGrafo], alignment=ft.MainAxisAlignment.CENTER)
+        self._page.controls.append(row1)
 
-        self.lst = ft.ListView(expand=1, spacing=8, padding=10, auto_scroll=False)
+        # Input store e azioni
+        self._txtIdStore = ft.TextField(label="store_id di partenza", disabled=True, width=220)
+        self._btnRaggiungibili = ft.ElevatedButton(text="Raggiungibili (BFS)",
+                                                   on_click=self._controller.handleRaggiungibili, disabled=True)
+        self._btnOutVolume = ft.ElevatedButton(text="Out-volume",
+                                               on_click=self._controller.handleOutVolume, disabled=True)
 
-        self._page.add(
-            ft.Row([btnBuild]),
-            ft.Row([self.dd_products, self.txt_L, btnVic, btnVol, btnCC, btnBest]),
-            self.lst
-        )
+        row2 = ft.Row([self._txtIdStore, self._btnRaggiungibili, self._btnOutVolume],
+                      alignment=ft.MainAxisAlignment.CENTER)
+        self._page.controls.append(row2)
+
+        # Ricerca cammino ottimo con L fisso, pesi decrescenti
+        self._ddLun = ft.Dropdown(label="Lunghezza L", disabled=True, width=160)
+        self._btnCerca = ft.ElevatedButton(text="Cammino ottimo (L, pesi decrescenti)",
+                                           on_click=self._controller.handleCerca, disabled=True)
+
+        row3 = ft.Row([self._ddLun, self._btnCerca], alignment=ft.MainAxisAlignment.CENTER)
+        self._page.controls.append(row3)
+
+        # Output
+        self.txt_result = ft.ListView(expand=1, spacing=10, padding=16, auto_scroll=False)
+        self._page.controls.append(self.txt_result)
         self._page.update()
 
-    def set_controller(self, c): self._ctl = c
+    # wiring del controller
+    @property
+    def controller(self): return self._controller
+    @controller.setter
+    def controller(self, c): self._controller = c
+    def set_controller(self, c): self._controller = c
+
     def update_page(self): self._page.update()
