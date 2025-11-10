@@ -1,76 +1,44 @@
+# database/dao_products_sim1.py
 from database.DB_connect import DBConnect
+from model.product import Product
+from model.arco import Arco  # dataclass: o1, o2, peso
 
-from model.order import Order
-class DAO():
-    def __init__(self):
-        pass
-
+class DAO_ProdSim1:
 
     @staticmethod
-    def getAllStores():
+    def get_all_products():
+        """
+        Tutti i prodotti come vertici del grafo.
+        """
         conn = DBConnect.get_connection()
-
-        results = []
-
         cursor = conn.cursor(dictionary=True)
-        query = "SELECT distinct s.store_id as store, s.store_name as name from stores s"
+        query = "SELECT * FROM products"
+        cursor.execute(query)
+        res = [Product(**row) for row in cursor]
+        cursor.close(); conn.close()
+        return res
 
+    @staticmethod
+    def get_edges_copurchase(idmap):
+        """
+        Coppie di prodotti che compaiono nello stesso ordine.
+        weight = numero ordini condivisi.
+        """
+        conn = DBConnect.get_connection()
+        cursor = conn.cursor(dictionary=True)
+        query = """
+        SELECT oi1.product_id AS p1, oi2.product_id AS p2, COUNT(*) AS peso
+        FROM order_items oi1, order_items oi2
+        WHERE oi1.order_id = oi2.order_id
+          AND oi1.product_id < oi2.product_id
+        GROUP BY oi1.product_id, oi2.product_id
+        """
         cursor.execute(query)
 
+        res = []
         for row in cursor:
-            print(row)
-            results.append((row["store"], row["name"]))
-
-        cursor.close()
-        conn.close()
-        return results
-
-    @staticmethod
-    def getAllOrdersbyStore(store):
-        conn = DBConnect.get_connection()
-
-        results = []
-
-        cursor = conn.cursor(dictionary=True)
-        query = """SELECT distinct * from orders o where o.store_id=%s"""
-
-        cursor.execute(query, (store,))
-
-        for row in cursor:
-            results.append(Order(**row))
-
-        cursor.close()
-        conn.close()
-        return results
-
-    @staticmethod
-    def getEdges(store, k, idMap):
-        conn = DBConnect.get_connection()
-
-        results = []
-
-        cursor = conn.cursor(dictionary=True)
-        query = """Select DISTINCT o1.order_id as id1, o2.order_id as id2, count(oi.quantity+ oi2.quantity) as cnt
-                from orders o1, orders o2, order_items oi, order_items oi2 
-                where o1.store_id=%s
-                and o1.store_id=o2.store_id 
-                and o1.order_date > o2.order_date
-                and oi.order_id = o1.order_id
-                and oi2.order_id  = o2.order_id
-                and DATEDIFF(o1.order_Date, o2.order_date) < %s
-                group by o1.order_id, o2.order_id	"""
-
-        cursor.execute(query, (store,k))
-
-        for row in cursor:
-            results.append((idMap[row["id1"]],idMap[row["id2"]], row["cnt"]))
-
-
-        cursor.close()
-        conn.close()
-
-        return results
-
-if __name__ == '__main__':
-    DAO = DAO()
-    stores = DAO.getAllStores()
+            p1, p2, w = row["p1"], row["p2"], row["peso"]
+            if p1 in idmap and p2 in idmap and w > 0:
+                res.append(Arco(idmap[p1], idmap[p2], w))
+        cursor.close(); conn.close()
+        return res

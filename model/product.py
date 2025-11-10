@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 
 @dataclass
-class Prodotto:
+class Product:
     """
     Dataclass che rappresenta una riga della tabella `products`.
     """
